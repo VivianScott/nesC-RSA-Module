@@ -25,8 +25,8 @@ implementation{
     int64_t gcd(int64_t a, int64_t h){
       int64_t temp;
     */
-    uint64_t gcd(uint64_t a, uint64_t h){
-      uint64_t temp;
+    int64_t gcd(int64_t a, int64_t h){
+      int64_t temp;
       while(TRUE){
         temp = a%h;
         if(temp==0){
@@ -49,16 +49,16 @@ implementation{
       int64_t q;
       int64_t r;
 */
-    uint64_t ExtEuclid(uint64_t a, uint64_t b){
-      uint64_t x = 0;
-      uint64_t y = 1;
-      uint64_t u = 1;
-      uint64_t v = 0;
-      uint64_t gcdVar = b;
-      uint64_t m;
-      uint64_t n;
-      uint64_t q;
-      uint64_t r;
+    int64_t ExtEuclid(int64_t a, int64_t b){
+      int64_t x = 0;
+      int64_t y = 1;
+      int64_t u = 1;
+      int64_t v = 0;
+      int64_t gcdVar = b;
+      int64_t m;
+      int64_t n;
+      int64_t q;
+      int64_t r;
       while(a != 0){
         q = gcdVar/a;
         r = gcdVar%a;
@@ -74,8 +74,24 @@ implementation{
       return y;
     }
 
+    int64_t ExtendedEuclidean(int64_t a, int64_t b, int64_t* x, int64_t* y){
+      int64_t xTemp, yTemp;
+      int64_t d;
+
+      if(a == 0){
+        *x = 0;
+        *y = 1;
+        return b;
+      }
+
+      d = ExtendedEuclidean(b%a, a, &xTemp, &yTemp);
+      *x = yTemp - (b/a) * xTemp;
+      *y = xTemp;
+      return d;
+    }
+
     //int64_t rsa_modExp(int64_t b, int64_t e, int64_t m){
-    uint64_t rsa_modExp(uint64_t b, uint64_t e, uint64_t m){
+    int64_t rsa_modExp(int64_t b, int64_t e, int64_t m){
       if(b<0 || e<0 || m<=0){
         exit(1);
       }
@@ -158,8 +174,8 @@ implementation{
       uint64_t k;
       uint64_t x;
 
-      p = call RSAinterface.rsa_gen_prime();
-      q = call RSAinterface.rsa_gen_prime();
+      //p = call RSAinterface.rsa_gen_prime();
+      //q = call RSAinterface.rsa_gen_prime();
 
       dbg(GENERAL_CHANNEL, "p: %llu q: %llu \n", p , q);
 
@@ -245,6 +261,49 @@ implementation{
         dbg(GENERAL_CHANNEL, "priv modulus: %d, priv exponent: %d \n", privKey.modulus, privKey.exponent);
     }
 
+    command void RSAinterface.gen_key(){
+      int64_t p, q, n, phi_n, e, d, x, y;
+
+      dbg(GENERAL_CHANNEL, "Key generation started...\n");
+
+      p = call RSAinterface.rsa_gen_prime();
+      q = call RSAinterface.rsa_gen_prime();
+      n = p*q;
+      phi_n = (p-1)*(q-1);
+
+      pubKey.modulus = n;
+      privKey.modulus = n;
+
+      do{
+        e = rand() % (phi_n - 2);
+        e = e+2;
+      }while(gcd(e, phi_n) != 1 || gcd(e, n) != 1);
+
+      dbg(GENERAL_CHANNEL, "Encryption key generated...\n");
+
+      //this is too slow for big numbers
+      /*
+      d = 1;
+      while(((d*e)%phi_n)!=1){
+        d++;
+      }
+      */
+      ExtendedEuclidean(phi_n, e, &x, &y);
+      d = y;
+
+      if(d<0){
+        d = phi_n - d;
+      }
+      //d = (phi_n + 1)/e;
+
+      dbg(GENERAL_CHANNEL, "Decryption key generated...\n");
+
+      pubKey.exponent = e;
+      privKey.exponent = d;
+
+      dbg(GENERAL_CHANNEL, "p: %lld, q: %lld, n or modulus: %lld, phi_n: %lld, e: %lld, d: %lld \n", p, q, n, phi_n, e, d);
+    }
+
     //command int64_t* RSAinterface.rsa_encrypt(const char *message, const uint32_t message_size, const struct public_key_class *pub){
     command int64_t* RSAinterface.rsa_encrypt(const char *message, const uint32_t message_size){
         int64_t *encrypted = malloc(sizeof(int64_t)*message_size);
@@ -262,19 +321,6 @@ implementation{
         }
         //dbg(GENERAL_CHANNEL, "End of loop \n");
         return encrypted;
-    }
-
-    command void RSAinterface.gen_key(){
-      uint64_t p, q, n, phi_n;
-      p = call RSAinterface.rsa_gen_prime();
-      q = call RSAinterface.rsa_gen_prime();
-      n = p*q;
-      phi_n = (p-1)*(q-1);
-
-      pubKey.modulus = n;
-      privKey.modulus = n;
-
-      dbg(GENERAL_CHANNEL, "p: %llu, q: %llu, n: %llu, phi_n: %llu \n", p, q, n, phi_n);
     }
 
     //command char* RSAinterface.rsa_decrypt(const int64_t *message, const uint32_t message_size, const struct private_key_class *priv){
