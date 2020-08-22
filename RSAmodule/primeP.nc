@@ -65,7 +65,8 @@ implementation{
       if(r >= 2150000000){
         r = r/2;
       }
-      r = r/1000000;
+      //r = r/100000; //<- for 4 digit primes (works)
+      //r = r/10;
       dbg(GENERAL_CHANNEL, "Generated number: %lu \n", r);
       return r;
   }

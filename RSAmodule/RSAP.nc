@@ -25,8 +25,8 @@ implementation{
     int64_t gcd(int64_t a, int64_t h){
       int64_t temp;
     */
-    int64_t gcd(int64_t a, int64_t h){
-      int64_t temp;
+    uint64_t gcd(uint64_t a, uint64_t h){
+      uint64_t temp;
       while(TRUE){
         temp = a%h;
         if(temp==0){
@@ -37,18 +37,6 @@ implementation{
       }
     }
 
-/*
-    int64_t ExtEuclid(int64_t a, int64_t b){
-      int64_t x = 0;
-      int64_t y = 1;
-      int64_t u = 1;
-      int64_t v = 0;
-      int64_t gcdVar = b;
-      int64_t m;
-      int64_t n;
-      int64_t q;
-      int64_t r;
-*/
     int64_t ExtEuclid(int64_t a, int64_t b){
       int64_t x = 0;
       int64_t y = 1;
@@ -74,6 +62,10 @@ implementation{
       return y;
     }
 
+    int64_t ExtendEuclid(int64_t a, int64_t b, int64_t* x, int64_t* y){
+
+    }
+
     int64_t ExtendedEuclidean(int64_t a, int64_t b, int64_t* x, int64_t* y){
       int64_t xTemp, yTemp;
       int64_t d;
@@ -90,8 +82,50 @@ implementation{
       return d;
     }
 
+    size_t highestOne(uint64_t a){
+      size_t bits = 0;
+      while(a!=0){
+        ++bits;
+        a>>=1;
+      }
+      return bits;
+    }
+
+    bool bboverflow(uint64_t a, uint64_t b){
+      size_t aBits, bBits;
+      aBits = highestOne(a);
+      bBits = highestOne(b);
+      return(aBits+bBits>=64);
+      //return(aBits+bBits>=58); //<- conservative tests to catch all overflow (will catch non overflow)
+    }
+
+    uint64_t rsa_bbcalc(uint64_t b1, uint64_t b2, uint64_t m){
+      b1 = b1 % m;
+      b2 = b2 % m;
+      if (!bboverflow(b1,b2)){
+      return(b1*b2 % m);
+      }
+      if(b1%2 == 0 && b2%2 == 0){
+        //printf("case 1\n");
+        return(rsa_bbcalc(2*b1 % m, b2/2, m) % m);
+      }
+      if(b1%2 == 1 && b2%2 == 1){
+        //printf("case 2\n");
+        return((rsa_bbcalc(b1 - 1,b2 - 1, m) + b1 + b2 - 1) % m);
+      }
+      if(b1%2 == 1 && b2%2 == 0){
+        //printf("case 3\n");
+        return((rsa_bbcalc(b1 - 1,b2, m) + b2) % m);
+      }
+      if(b1%2 == 0 && b2%2 == 1){
+        //printf("case 4\n");
+        return((rsa_bbcalc(b1,b2 - 1, m) + b1) % m);
+      }
+    }
+
     //int64_t rsa_modExp(int64_t b, int64_t e, int64_t m){
-    int64_t rsa_modExp(int64_t b, int64_t e, int64_t m){
+    uint64_t rsa_modExp(uint64_t b, uint64_t e, uint64_t m){
+      uint64_t tempB;
       if(b<0 || e<0 || m<=0){
         exit(1);
       }
@@ -103,41 +137,53 @@ implementation{
         return b;
       }
       if(e%2 == 0){
-        return(rsa_modExp(b*b%m, e/2, m) % m);
+        //if(bboverflow(b,b)){
+          //dbg(GENERAL_CHANNEL, "Overflow Detected... \n");
+          b = rsa_bbcalc(b,b,m);
+          return(rsa_modExp(b, e/2, m) % m);
+        /*
+        }else{
+          //dbg(GENERAL_CHANNEL, "B = %llu \n", b);
+          return(rsa_modExp(b*b%m, e/2, m) % m);
+        }
+        */
       }
       if(e%2 == 1){
-        return(b*rsa_modExp(b,(e-1), m) % m);
+
+        b = rsa_bbcalc(b, rsa_modExp(b,(e-1),m), m);
+
+        return(b);
+        //return(b*rsa_modExp(b,(e-1), m) % m);
       }
     }
 
-    int64_t inverse(int64_t a, int64_t b){
-      int64_t inv;
-      int64_t q, r, r1=a, r2 = b, t, t1=0, t2=1;
+    int64_t inverse(int64_t a, int64_t n){
+      int64_t t, r, newt, newr, quotient, temp;
+      t = 0;
+      r = n;
+      newt = 1;
+      newr = a;
 
-      while(r2>0){
-        q = r1/r2;
-        r = r1 - q * r2;
-        r1 = r2;
-        r2 = r;
-
-        t = t1 - q * r2;
-        t1 = t2;
-        t2 = t;
+      while(newr != 0){
+        quotient = r / newr;
+        temp = t;
+        t = newt;
+        newt = temp - quotient*newt;
+        temp = r;
+        r = newr;
+        newr = temp - quotient*newr;
       }
 
-      if(r1 == 1){
-        inv = t1;
+      if(r<1){
+        dbg(GENERAL_CHANNEL, "not invertable\n");
+        return 0;
       }
-      if(inv < 0){
-        inv = inv + a;
+      if(t<0){
+        return t+n;
       }
-      return inv;
+      return t;
     }
-    /*
-    command void RSAinterface.rsa_gen_keys(struct public_key_class *pub, struct private_key_class *priv, const char *PRIME_SOURCE_FILE){
 
-    }
-    */
     command bool RSAinterface.RSAtest(){
       return 1;
     }
@@ -163,83 +209,6 @@ implementation{
       return num;
     }
 
-    command void RSAinterface.rsa_gen_key(){
-      uint32_t p;
-      uint32_t q;
-      uint64_t n;
-      uint64_t count;
-      uint64_t totient;
-      uint64_t e;
-      uint64_t d;
-      uint64_t k;
-      uint64_t x;
-
-      //p = call RSAinterface.rsa_gen_prime();
-      //q = call RSAinterface.rsa_gen_prime();
-
-      dbg(GENERAL_CHANNEL, "p: %llu q: %llu \n", p , q);
-
-      n = p*q;
-      pubKey.modulus = n;
-      privKey.modulus = n;
-      totient = (p-1)*(q-1);
-
-      do{
-        e = rand() % (totient - 2) + 2;
-      }while(gcd(e, totient) != 1);
-
-      d = inverse(totient, e);
-
-      /*
-      for(e = totient-1; e>2; e--){
-        if(gcd(e,totient) == 1){
-          break;
-        }
-      }
-
-      for(k = 0; k<10; k++){
-        x = 1+i*totient;
-        if(x%e == 0){
-          d = x/e;
-          break;
-        }
-      }
-      */
-
-      /*
-      e = powl(2, 4)+1;
-
-      d = ExtEuclid(totient,e);
-      while(d<0){
-        d = d+totient;
-      }
-      */
-
-      /*
-      e = 2;
-
-      while(e<totient){
-        count = gcd(e, totient);
-        if(count == 1){
-          break;
-        }else{
-          e++;
-        }
-      }
-
-      k = 2;
-
-      d = (1+(k*totient))/e;
-      */
-
-      pubKey.exponent = e;
-      privKey.exponent = d;
-
-      dbg(GENERAL_CHANNEL, "pubKey modulus: %llu pubKey exponent: %llu\n", pubKey.modulus, pubKey.exponent);
-      dbg(GENERAL_CHANNEL, "privKey modulus: %llu privKey exponent: %llu\n", privKey.modulus, privKey.exponent);
-    }
-    //command void RSAinterface.rsa_gen_keys(struct public_key_class *pub, struct private_key_class *priv){
-    //command void RSAinterface.rsa_gen_keys(uint64_t *pubMod, uint64_t *pubExp, uint64_t *privMod, uint64_t *privExp){
     command void RSAinterface.rsa_test_key(){
 
         pubKey.modulus = 3127;
@@ -248,13 +217,6 @@ implementation{
         privKey.modulus = 3127;
         privKey.exponent = 2011;
 
-      /*
-        pubKey.modulus = 14;
-        pubKey.exponent = 5;
-
-        privKey.modulus = 14;
-        privKey.exponent = 11;
-      */
         dbg(GENERAL_CHANNEL, "VALUES ASSIGNED \n");
 
         dbg(GENERAL_CHANNEL, "pub modulus: %d, pub exponent: %d \n", pubKey.modulus, pubKey.exponent);
@@ -262,7 +224,8 @@ implementation{
     }
 
     command void RSAinterface.gen_key(){
-      int64_t p, q, n, phi_n, e, d, x, y;
+      int64_t p, q, n, phi_n, e, d, x, y, dtest, dres;
+      uint16_t loops;
 
       dbg(GENERAL_CHANNEL, "Key generation started...\n");
 
@@ -274,28 +237,34 @@ implementation{
       pubKey.modulus = n;
       privKey.modulus = n;
 
+
       do{
         e = rand() % (phi_n - 2);
         e = e+2;
       }while(gcd(e, phi_n) != 1 || gcd(e, n) != 1);
 
-      dbg(GENERAL_CHANNEL, "Encryption key generated...\n");
-
-      //this is too slow for big numbers
       /*
-      d = 1;
-      while(((d*e)%phi_n)!=1){
-        d++;
+      for(e = 3; e<phi_n; e++){
+        if(gcd(e, phi_n) == 1 && gcd(e, n) == 1){
+          break;
+        }
       }
       */
+      dbg(GENERAL_CHANNEL, "Encryption key generated...\n");
+
+      /*
       ExtendedEuclidean(phi_n, e, &x, &y);
+
+      //mpz_invert(&e, &phi_n, &d);
+
       d = y;
 
       if(d<0){
         d = phi_n - d;
       }
-      //d = (phi_n + 1)/e;
+      */
 
+      d = inverse(e,phi_n);
       dbg(GENERAL_CHANNEL, "Decryption key generated...\n");
 
       pubKey.exponent = e;
@@ -305,9 +274,9 @@ implementation{
     }
 
     //command int64_t* RSAinterface.rsa_encrypt(const char *message, const uint32_t message_size, const struct public_key_class *pub){
-    command int64_t* RSAinterface.rsa_encrypt(const char *message, const uint32_t message_size){
-        int64_t *encrypted = malloc(sizeof(int64_t)*message_size);
-        int64_t k;
+    command uint64_t* RSAinterface.rsa_encrypt(const char *message, const uint32_t message_size){
+        uint64_t *encrypted = malloc(sizeof(int64_t)*message_size);
+        uint64_t k;
 
         //dbg(GENERAL_CHANNEL, "Beginning encryption \n");
         if(encrypted == NULL){
@@ -324,13 +293,13 @@ implementation{
     }
 
     //command char* RSAinterface.rsa_decrypt(const int64_t *message, const uint32_t message_size, const struct private_key_class *priv){
-    command char* RSAinterface.rsa_decrypt(const int64_t *message, const uint32_t message_size){
+    command char* RSAinterface.rsa_decrypt(const uint64_t *message, const uint32_t message_size){
 
       char *decrypted;
-      char *temp;
-      int64_t k = 0;
+      uint64_t *temp; //char
+      uint64_t k = 0;
 
-      if(message_size % sizeof(int64_t) != 0){
+      if(message_size % sizeof(uint64_t) != 0){
         //message size not devisable, so decryption fails
         dbg(GENERAL_CHANNEL, "Error: message not devisable.\n");
         return NULL;
@@ -338,6 +307,7 @@ implementation{
 
       decrypted = malloc(message_size/sizeof(int64_t));
       temp = malloc(message_size);
+      //dbg(GENERAL_CHANNEL, "size of temp: %d \n", message_size);
 
       if((decrypted == NULL) || (temp==NULL)){
         //heap allocation fails
@@ -345,14 +315,50 @@ implementation{
         return NULL;
       }
 
+      //error storing in uint8_t char rather than uint64_t
       for(k=0; k<message_size/8; k++){
+        dbg(GENERAL_CHANNEL, "cyphertext: %llu \n", message[k]);
         temp[k] = rsa_modExp(message[k], privKey.exponent, privKey.modulus);
+        dbg(GENERAL_CHANNEL, "decrypted: %llu \n", temp[k]);
       }
 
       for(k=0; k<message_size/8; k++){
-        decrypted[k] = temp[k];
+        decrypted[k] = (uint8_t)temp[k];
       }
       free(temp);
       return decrypted;
+  }
+
+  command void RSAinterface.test_key_gen(){
+    uint16_t i, npasses, fails;
+    uint64_t keyTest, keyRes;
+    for(i = 1; i<100; i++){
+      srand(i);
+      call RSAinterface.gen_key();
+      keyTest = rsa_modExp(97, pubKey.exponent, pubKey.modulus);
+      keyRes = rsa_modExp(keyTest, privKey.exponent, privKey.modulus);
+      if(keyRes == 97){
+        npasses++;
+      }else{
+        fails++;
+      }
+    }
+    dbg(GENERAL_CHANNEL, "Test complete... %d passes... %d fails...\n", npasses, fails);
+    npasses = 0;
+    fails = 0;
+  }
+
+  command int64_t RSAinterface.get_modulus(){
+    if(pubKey.modulus == NULL){
+      return 0;
+    }
+    return pubKey.modulus;
+  }
+
+  command int64_t RSAinterface.get_exponent(){
+    if(pubKey.exponent == NULL){
+      return 0;
+    }
+    return pubKey.exponent;
   }
 }
